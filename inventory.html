@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Inventory Management{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <h2>Inventory Management</h2>
+    </div>
+    <div class="col-md-6 text-end">
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addInventoryModal">
+            <i class="bi bi-plus-circle"></i> Add Inventory
+        </button>
+    </div>
+</div>
+
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover" id="inventoryTable" width="100%" cellspacing="0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Product</th>
+                        <th>Branch</th>
+                        <th>Quantity</th>
+                        <th>Reorder Level</th>
+                        <th>Total Value</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in inventory %}
+                    <tr>
+                        <td>{{ item['product_name'] }}</td>
+                        <td>{{ item['branch_name'] }}</td>
+                        <td>{{ item['quantity'] }}</td>
+                        <td>{{ item['reorder_level'] }}</td>
+                        <td>${{ "%.2f"|format(item['total_value']) }}</td>
+                        <td>
+                            {% if item['quantity'] <= item['reorder_level'] %}
+                                <span class="badge bg-danger">Low Stock</span>
+                            {% else %}
+                                <span class="badge bg-success">In Stock</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="#" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#updateInventoryModal{{ item['id'] }}">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{{ url_for('delete_inventory', id=item['id']) }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this inventory item?')">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+
+                    <!-- Update Inventory Modal -->
+                    <div class="modal fade" id="updateInventoryModal{{ item['id'] }}" tabindex="-1" aria-labelledby="updateInventoryModalLabel{{ item['id'] }}" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="updateInventoryModalLabel{{ item['id'] }}">Update Inventory</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <form method="POST" action="{{ url_for('update_inventory', id=item['id']) }}">
+                                    <div class="modal-body">
+                                        <p><strong>Product:</strong> {{ item['product_name'] }}</p>
+                                        <p><strong>Branch:</strong> {{ item['branch_name'] }}</p>
+                                        <div class="mb-3">
+                                            <label for="quantity{{ item['id'] }}" class="form-label">Quantity</label>
+                                            <input type="number" class="form-control" id="quantity{{ item['id'] }}" name="quantity" value="{{ item['quantity'] }}" required>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                        <button type="submit" class="btn btn-primary">Update Inventory</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add Inventory Modal -->
+<div class="modal fade" id="addInventoryModal" tabindex="-1" aria-labelledby="addInventoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addInventoryModalLabel">Add Inventory</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('add_inventory') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="product_id" class="form-label">Product</label>
+                        <select class="form-select" id="product_id" name="product_id" required>
+                            <option value="">Select Product</option>
+                            {% for product in products %}
+                            <option value="{{ product['id'] }}">{{ product['name'] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="branch_id" class="form-label">Branch</label>
+                        <select class="form-select" id="branch_id" name="branch_id" required>
+                            <option value="">Select Branch</option>
+                            {% for branch in branches %}
+                            <option value="{{ branch['id'] }}">{{ branch['name'] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="quantity" class="form-label">Quantity</label>
+                        <input type="number" class="form-control" id="quantity" name="quantity" required>
+                    </div>
+                    <div id="currentInventory" class="alert alert-info" style="display: none;">
+                        Current inventory: <span id="inventoryQuantity">0</span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Save Inventory</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Show current inventory when product and branch are selected
+    $('#product_id, #branch_id').change(function() {
+        var product_id = $('#product_id').val();
+        var branch_id = $('#branch_id').val();
+        
+        if (product_id && branch_id) {
+            $.get('/api/inventory/' + branch_id + '/' + product_id, function(data) {
+                $('#inventoryQuantity').text(data.quantity);
+                $('#currentInventory').show();
+            });
+        } else {
+            $('#currentInventory').hide();
+        }
+    });
+});
+</script>
+{% endblock %}
